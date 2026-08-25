@@ -5,6 +5,8 @@ import { Breadcrumbs } from "@/components/marketing/breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = buildMetadata({
   title: "Blog | OlyxMedia",
   description: "Digital marketing insights, SEO guides and social media strategy for Indian businesses.",
