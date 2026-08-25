@@ -6,6 +6,10 @@ function getDatasourceUrl() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) return undefined;
 
+  if (!databaseUrl.startsWith("postgresql://") && !databaseUrl.startsWith("postgres://")) {
+    throw new Error("Invalid DATABASE_URL: it must start with postgresql:// or postgres://. Check your .env or Vercel environment variable.");
+  }
+
   try {
     const url = new URL(databaseUrl);
 
