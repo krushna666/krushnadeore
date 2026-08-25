@@ -40,6 +40,9 @@ yarn-error.log*
 /public/uploads/*
 !/public/uploads/.gitkeep
 
+# PHP production configuration
+/php-site/config.local.php
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
