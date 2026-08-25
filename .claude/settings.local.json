@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(npx --version)",
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Read(//tmp/**)",
+      "Bash(rm -rf olyxmedia-scaffold)",
+      "Bash(npx --yes create-next-app@latest olyxmedia-scaffold --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Bash(rm -rf .git)",
+      "Bash(rsync -a --exclude='.git' /tmp/olyxmedia-scaffold/ /home/user/Olyxmedia-/)"
+    ]
+  }
+}
