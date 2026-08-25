@@ -55,6 +55,44 @@ if ($route === 'admin/blogs') {
         ?><section class="section"><p class="eyebrow">CMS</p><h1>Blog</h1><div class="grid"><article><h2>Create article</h2><form method="post"><input type="hidden" name="action" value="create"><label>Title<input name="title" required></label><label>Slug<input name="slug" pattern="[a-z0-9-]+" required></label><label>Excerpt<textarea name="excerpt" rows="3"></textarea></label><label>Content<textarea name="content" rows="8" required></textarea></label><label>Status<select name="status"><option>DRAFT</option><option>PUBLISHED</option></select></label><button class="button" type="submit">Save article</button></form></article><article><h2>Articles</h2><?php foreach ($posts as $post): ?><p><strong><?= e($post['title']) ?></strong><br><small><?= e($post['status']) ?> · <?= e($post['slug']) ?></small></p><form method="post"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $post['id'] ?>"><button type="submit">Delete</button></form><?php endforeach; if (!$posts) echo '<p>No articles yet.</p>'; ?></article></div></section><?php pageEnd(); exit;
 }
 
+if ($route === 'admin/leads') {
+    requireAdmin();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['id'], $_POST['status'])) {
+        $allowedStatuses = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL_SENT', 'WON', 'LOST'];
+        $status = (string) $_POST['status'];
+        if (in_array($status, $allowedStatuses, true)) {
+            db()->prepare('UPDATE leads SET status = ? WHERE id = ?')->execute([$status, (int) $_POST['id']]);
+        }
+        redirect('admin/leads');
+    }
+    $leads = db()->query('SELECT id, name, email, phone, message, status, created_at FROM leads ORDER BY created_at DESC')->fetchAll();
+    pageStart('Manage Leads');
+    ?><section class="section"><p class="eyebrow">CMS</p><h1>Leads</h1><div class="grid"><?php foreach ($leads as $lead): ?><article><h2><?= e($lead['name']) ?></h2><p><?= e($lead['email']) ?> · <?= e($lead['phone']) ?></p><p><?= nl2br(e($lead['message'])) ?></p><form method="post"><input type="hidden" name="id" value="<?= (int) $lead['id'] ?>"><label>Status<select name="status"><?php foreach (['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL_SENT', 'WON', 'LOST'] as $status): ?><option <?= $lead['status'] === $status ? 'selected' : '' ?>><?= $status ?></option><?php endforeach; ?></select></label><button type="submit">Update</button></form></article><?php endforeach; if (!$leads) echo '<p>No leads yet.</p>'; ?></div></section><?php pageEnd(); exit;
+}
+
+if ($route === 'admin/media') {
+    requireAdmin();
+    $uploadError = null;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
+        $file = $_FILES['file'];
+        $allowed = ['image/jpeg' => '.jpg', 'image/png' => '.png', 'image/webp' => '.webp', 'image/gif' => '.gif', 'video/mp4' => '.mp4', 'video/webm' => '.webm'];
+        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+        if ($file['error'] !== UPLOAD_ERR_OK || !isset($allowed[$mime]) || $file['size'] > 50 * 1024 * 1024) {
+            $uploadError = 'Invalid file or file is larger than 50MB.';
+        } else {
+            $filename = bin2hex(random_bytes(16)) . $allowed[$mime];
+            $directory = __DIR__ . '/uploads';
+            if (!is_dir($directory)) mkdir($directory, 0755, true);
+            move_uploaded_file($file['tmp_name'], $directory . '/' . $filename);
+            $statement = db()->prepare('INSERT INTO media (url, filename, mime_type, size, alt_text) VALUES (?, ?, ?, ?, ?)');
+            $statement->execute(['uploads/' . $filename, $file['name'], $mime, $file['size'], trim((string) ($_POST['alt_text'] ?? ''))]);
+        }
+    }
+    $media = db()->query('SELECT * FROM media ORDER BY created_at DESC')->fetchAll();
+    pageStart('Media Library');
+    ?><section class="section"><p class="eyebrow">CMS</p><h1>Media Library</h1><?php if ($uploadError) echo '<p class="error">' . e($uploadError) . '</p>'; ?><form method="post" enctype="multipart/form-data"><label>File<input type="file" name="file" required></label><label>Alt text<input name="alt_text"></label><button class="button" type="submit">Upload file</button></form><div class="grid"><?php foreach ($media as $item): ?><article><p><?= e($item['filename']) ?></p><small><?= e($item['mime_type']) ?> · <?= (int) $item['size'] ?> bytes</small></article><?php endforeach; ?></div></section><?php pageEnd(); exit;
+}
+
 if ($route === 'admin') {
     $user = requireAdmin();
     $postCount = (int) db()->query("SELECT COUNT(*) FROM posts WHERE status = 'PUBLISHED'")->fetchColumn();
