@@ -451,7 +451,7 @@ async function main() {
         author: { connect: { id: teamAuthor.id } },
         ...(category ? { category: { connect: { id: category.id } } } : {}),
         tags: { set: tags.map((tag) => ({ id: tag.id })) },
-        ...(adminUser ? { updatedById: adminUser.id } : {}),
+        ...(adminUser ? { updatedBy: { connect: { id: adminUser.id } } } : {}),
       },
       create: {
         title: post.title,
