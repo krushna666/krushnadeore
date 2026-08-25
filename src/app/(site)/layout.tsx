@@ -6,6 +6,8 @@ import { CookieConsent } from "@/components/layout/cookie-consent";
 import { AnalyticsScripts } from "@/components/layout/analytics-scripts";
 import { getSiteSettings } from "@/lib/site-settings";
 
+export const dynamic = "force-dynamic";
+
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSiteSettings();
 

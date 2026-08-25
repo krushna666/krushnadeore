@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { SITE } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 function escapeXml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
