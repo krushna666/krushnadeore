@@ -31,6 +31,30 @@ if ($route === 'admin/login') {
     ?><section class="section narrow"><p class="eyebrow">OlyxMedia CMS</p><h1>Sign in</h1><?php if ($error) echo '<p class="error">' . e($error) . '</p>'; ?><form method="post"><label>Email<input type="email" name="email" required></label><label>Password<input type="password" name="password" required></label><button class="button" type="submit">Sign in</button></form></section><?php pageEnd(); exit;
 }
 
+if ($route === 'admin/blogs') {
+        requireAdmin();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $action = (string) ($_POST['action'] ?? '');
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($action === 'delete' && $id > 0) {
+                db()->prepare('DELETE FROM posts WHERE id = ?')->execute([$id]);
+            } elseif ($action === 'create') {
+                $title = trim((string) ($_POST['title'] ?? ''));
+                $slug = trim((string) ($_POST['slug'] ?? ''));
+                $content = trim((string) ($_POST['content'] ?? ''));
+                $status = ($_POST['status'] ?? 'DRAFT') === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT';
+                if ($title !== '' && preg_match('/^[a-z0-9-]+$/', $slug) && $content !== '') {
+                    $statement = db()->prepare('INSERT INTO posts (title, slug, excerpt, content, status, published_at) VALUES (?, ?, ?, ?, ?, ?)');
+                    $statement->execute([$title, $slug, trim((string) ($_POST['excerpt'] ?? '')), $content, $status, $status === 'PUBLISHED' ? date('Y-m-d H:i:s') : null]);
+                }
+            }
+            redirect('admin/blogs');
+        }
+        $posts = db()->query('SELECT id, title, slug, status, published_at FROM posts ORDER BY created_at DESC')->fetchAll();
+        pageStart('Manage Blog');
+        ?><section class="section"><p class="eyebrow">CMS</p><h1>Blog</h1><div class="grid"><article><h2>Create article</h2><form method="post"><input type="hidden" name="action" value="create"><label>Title<input name="title" required></label><label>Slug<input name="slug" pattern="[a-z0-9-]+" required></label><label>Excerpt<textarea name="excerpt" rows="3"></textarea></label><label>Content<textarea name="content" rows="8" required></textarea></label><label>Status<select name="status"><option>DRAFT</option><option>PUBLISHED</option></select></label><button class="button" type="submit">Save article</button></form></article><article><h2>Articles</h2><?php foreach ($posts as $post): ?><p><strong><?= e($post['title']) ?></strong><br><small><?= e($post['status']) ?> · <?= e($post['slug']) ?></small></p><form method="post"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int) $post['id'] ?>"><button type="submit">Delete</button></form><?php endforeach; if (!$posts) echo '<p>No articles yet.</p>'; ?></article></div></section><?php pageEnd(); exit;
+}
+
 if ($route === 'admin') {
     $user = requireAdmin();
     $postCount = (int) db()->query("SELECT COUNT(*) FROM posts WHERE status = 'PUBLISHED'")->fetchColumn();
