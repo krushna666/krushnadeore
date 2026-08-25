@@ -37,12 +37,17 @@ export async function forgotPasswordAction(
     });
 
     const resetUrl = absoluteUrl(`/admin/reset-password?token=${rawToken}`);
-    await sendEmail({
-      to: user.email,
-      subject: "Reset your OlyxMedia admin password",
-      html: `<p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
-      text: `Reset your password: ${resetUrl} (expires in 1 hour)`,
-    });
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "Reset your OlyxMedia admin password",
+        html: `<p>Click the link below to reset your password. This link expires in 1 hour.</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+        text: `Reset your password: ${resetUrl} (expires in 1 hour)`,
+      });
+    } catch (error) {
+      console.error("Password reset email failed:", error);
+      return { error: "We could not send the reset email. Check the SMTP settings and try again." };
+    }
   }
 
   return { message: genericMessage };

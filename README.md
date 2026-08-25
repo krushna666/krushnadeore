@@ -97,6 +97,10 @@ including `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUC
 Supabase Storage bucket with the configured name (the default is `media`). The service-role key is used only
 by server actions and must never be exposed as a `NEXT_PUBLIC_*` variable.
 
+For real password-reset and lead emails, configure an SMTP mailbox. Hostinger mail commonly uses
+`smtp.hostinger.com` with port `465` (SSL) or `587` (STARTTLS). Set `SMTP_USER` to the full mailbox address,
+such as `support@olyxmedia.com`, and set `SMTP_FROM` to that same verified mailbox.
+
 Point `DATABASE_URL` at the Supabase Postgres connection string, run `npx prisma migrate deploy` as part of
 your build/release step, and configure the cron endpoint above if you want scheduled posts to publish
 automatically. Media uploads are stored in Supabase Storage instead of the local filesystem, so they persist

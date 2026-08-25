@@ -15,10 +15,12 @@ function getTransport() {
 
 export async function sendEmail(options: { to: string; subject: string; html: string; text?: string }) {
   const transport = getTransport();
-  const from = process.env.SMTP_FROM || "OlyxMedia Website <no-reply@olyxmedia.com>";
+  const from = process.env.SMTP_FROM || "OlyxMedia <support@olyxmedia.com>";
 
   if (!transport) {
-    // No SMTP configured (e.g. local dev) — log instead of failing silently.
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Email is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD.");
+    }
     console.log(`[email:dev-mode] to=${options.to} subject="${options.subject}"`);
     console.log(options.text || options.html);
     return;
