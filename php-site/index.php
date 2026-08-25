@@ -2,9 +2,42 @@
 declare(strict_types=1);
 
 require __DIR__ . '/functions.php';
+require __DIR__ . '/auth.php';
 
 $route = trim((string) ($_GET['route'] ?? ''), '/');
 $segments = $route === '' ? [] : explode('/', $route);
+
+if ($route === 'admin/logout') {
+    session_destroy();
+    redirect('admin/login');
+}
+
+if ($route === 'admin/login') {
+    if (currentUser()) redirect('admin');
+    $error = null;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $statement = db()->prepare('SELECT id, name, email, password_hash, role FROM users WHERE email = ? LIMIT 1');
+        $statement->execute([trim((string) ($_POST['email'] ?? ''))]);
+        $user = $statement->fetch();
+        if ($user && password_verify((string) ($_POST['password'] ?? ''), $user['password_hash'])) {
+            unset($user['password_hash']);
+            session_regenerate_id(true);
+            $_SESSION['user'] = $user;
+            redirect('admin');
+        }
+        $error = 'Invalid email or password.';
+    }
+    pageStart('Admin Login');
+    ?><section class="section narrow"><p class="eyebrow">OlyxMedia CMS</p><h1>Sign in</h1><?php if ($error) echo '<p class="error">' . e($error) . '</p>'; ?><form method="post"><label>Email<input type="email" name="email" required></label><label>Password<input type="password" name="password" required></label><button class="button" type="submit">Sign in</button></form></section><?php pageEnd(); exit;
+}
+
+if ($route === 'admin') {
+    $user = requireAdmin();
+    $postCount = (int) db()->query("SELECT COUNT(*) FROM posts WHERE status = 'PUBLISHED'")->fetchColumn();
+    $leadCount = (int) db()->query("SELECT COUNT(*) FROM leads WHERE status = 'NEW'")->fetchColumn();
+    pageStart('Admin Dashboard');
+    ?><section class="section narrow"><p class="eyebrow">CMS dashboard</p><h1>Welcome, <?= e($user['name']) ?></h1><div class="grid"><article><h2><?= $postCount ?></h2><p>Published posts</p></article><article><h2><?= $leadCount ?></h2><p>New leads</p></article><article><a class="button" href="<?= e(url('admin/logout')) ?>">Sign out</a></article></div></section><?php pageEnd(); exit;
+}
 
 if ($route === '') {
     pageStart('Digital Marketing That Moves Business');
@@ -28,6 +61,56 @@ if ($route === 'case-studies') {
     ?><section class="section"><p class="eyebrow">Verified work</p><h1>Case Studies</h1><div class="grid"><?php foreach ($items as $item): ?><article><h2><?= e($item['title']) ?></h2><p><?= e($item['client_name']) ?><?= $item['industry'] ? ' · ' . e($item['industry']) : '' ?></p></article><?php endforeach; ?></div><?php
     if (!$items) echo '<p>Case studies coming soon.</p>';
     ?></section><?php pageEnd(); exit;
+}
+
+if (in_array($segments[0] ?? '', ['services', 'industries', 'portfolio', 'testimonials', 'faq', 'glossary', 'resources', 'careers'], true) && count($segments) === 1) {
+    $titles = [
+        'services' => ['Services', 'Focused digital marketing services for sustainable growth.'],
+        'industries' => ['Industries', 'Marketing shaped around the realities of your industry.'],
+        'portfolio' => ['Portfolio', 'A selection of work created with care and intent.'],
+        'testimonials' => ['Testimonials', 'What clients say about working with OlyxMedia.'],
+        'faq' => ['FAQ', 'Answers to common questions about our work.'],
+        'glossary' => ['Glossary', 'Plain-language digital marketing definitions.'],
+        'resources' => ['Resources', 'Practical resources for your next growth move.'],
+        'careers' => ['Careers', 'Build meaningful marketing work with our team.'],
+    ];
+    [$title, $description] = $titles[$segments[0]];
+    pageStart($title, $description);
+    ?><section class="section narrow"><p class="eyebrow">OlyxMedia</p><h1><?= e($title) ?></h1><p class="lede"><?= e($description) ?></p><p>We are preparing this section with useful, verified information. Contact us to discuss your goals.</p><a class="button" href="<?= e(url('contact')) ?>">Talk to our team</a></section><?php
+    pageEnd(); exit;
+}
+
+if (in_array($segments[0] ?? '', ['about', 'pricing', 'contact', 'privacy-policy', 'terms-and-conditions', 'refund-policy', 'cookie-policy'], true) && count($segments) === 1 && $route !== 'contact') {
+    $titles = [
+        'about' => ['About OlyxMedia', 'A focused digital marketing partner for ambitious businesses.'],
+        'pricing' => ['Pricing', 'Clear scopes and practical marketing engagements.'],
+        'privacy-policy' => ['Privacy Policy', 'How OlyxMedia handles information submitted through this website.'],
+        'terms-and-conditions' => ['Terms and Conditions', 'Terms governing use of this website and our services.'],
+        'refund-policy' => ['Refund Policy', 'Our policy for payments and service engagements.'],
+        'cookie-policy' => ['Cookie Policy', 'Information about cookies used on this website.'],
+    ];
+    [$title, $description] = $titles[$segments[0]];
+    pageStart($title, $description);
+    ?><section class="section narrow"><p class="eyebrow">OlyxMedia</p><h1><?= e($title) ?></h1><p class="lede"><?= e($description) ?></p><p><?= e($description) ?> Please contact our team if you have questions about this page.</p></section><?php
+    pageEnd(); exit;
+}
+
+if (($segments[0] ?? '') === 'blog' && !empty($segments[1])) {
+    $statement = db()->prepare("SELECT * FROM posts WHERE slug = ? AND status = 'PUBLISHED' LIMIT 1");
+    $statement->execute([$segments[1]]);
+    $post = $statement->fetch();
+    if (!$post) { http_response_code(404); pageStart('Article Not Found'); echo '<section class="section narrow"><h1>Article not found</h1></section>'; pageEnd(); exit; }
+    pageStart($post['title'], $post['excerpt'] ?? '');
+    ?><article class="section narrow"><p class="eyebrow">Article</p><h1><?= e($post['title']) ?></h1><p class="lede"><?= e($post['excerpt'] ?? '') ?></p><div class="article-content"><?= $post['content'] ?></div></article><?php pageEnd(); exit;
+}
+
+if (($segments[0] ?? '') === 'case-studies' && !empty($segments[1])) {
+    $statement = db()->prepare("SELECT * FROM case_studies WHERE slug = ? AND status = 'PUBLISHED' LIMIT 1");
+    $statement->execute([$segments[1]]);
+    $item = $statement->fetch();
+    if (!$item) { http_response_code(404); pageStart('Case Study Not Found'); echo '<section class="section narrow"><h1>Case study not found</h1></section>'; pageEnd(); exit; }
+    pageStart($item['title'], $item['client_name']);
+    ?><article class="section narrow"><p class="eyebrow">Verified case study</p><h1><?= e($item['title']) ?></h1><p class="lede"><?= e($item['client_name']) ?><?= $item['industry'] ? ' · ' . e($item['industry']) : '' ?></p><?php if ($item['challenge']) echo '<h2>Challenge</h2><p>' . nl2br(e($item['challenge'])) . '</p>'; if ($item['strategy']) echo '<h2>Strategy</h2><p>' . nl2br(e($item['strategy'])) . '</p>'; if ($item['execution']) echo '<h2>Execution</h2><p>' . nl2br(e($item['execution'])) . '</p>'; ?></article><?php pageEnd(); exit;
 }
 
 if ($route === 'contact') {
