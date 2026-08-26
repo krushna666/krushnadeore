@@ -1,0 +1,558 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+enum PostStatus {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ClientCategory {
+  VERIFIED_CLIENT
+  PORTFOLIO_CLIENT
+  PARTNER
+  BRAND_WE_ADMIRE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL_SENT
+  WON
+  LOST
+}
+
+enum BacklinkStatus {
+  PROSPECT
+  CONTACTED
+  REPLIED
+  PUBLISHED
+  REJECTED
+}
+
+enum SubscriberStatus {
+  ACTIVE
+  UNSUBSCRIBED
+}
+
+enum PortfolioCategory {
+  SOCIAL_MEDIA
+  BRANDING
+  REELS
+  GRAPHIC_DESIGN
+  WEBSITES
+  SEO
+  PAID_ADS
+  CAMPAIGNS
+}
+
+// ---------------------------------------------------------------------------
+// Auth / Users
+// ---------------------------------------------------------------------------
+
+model User {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String    @unique
+  passwordHash       String
+  role               Role      @default(EDITOR)
+  image              String?
+  mustChangePassword Boolean   @default(false)
+  resetToken         String?   @unique
+  resetTokenExpiry   DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  posts       Post[]
+  mediaItems  Media[]
+  authorLink  Author?
+
+  @@index([email])
+}
+
+model Author {
+  id          String   @id @default(cuid())
+  userId      String?  @unique
+  user        User?    @relation(fields: [userId], references: [id])
+  name        String
+  slug        String   @unique
+  photoUrl    String?
+  bio         String?
+  jobTitle    String?
+  socialLinks Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts Post[]
+}
+
+// ---------------------------------------------------------------------------
+// Media Library
+// ---------------------------------------------------------------------------
+
+model Media {
+  id           String   @id @default(cuid())
+  url          String
+  filename     String
+  mimeType     String
+  size         Int
+  width        Int?
+  height       Int?
+  alt          String?
+  title        String?
+  caption      String?
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  postsAsFeatured   Post[]        @relation("PostFeaturedImage")
+  caseStudyGallery  CaseStudy[]   @relation("CaseStudyGallery")
+  caseStudyCover    CaseStudy[]   @relation("CaseStudyCoverImage")
+  portfolioGallery  Portfolio[]   @relation("PortfolioGallery")
+  portfolioCover    Portfolio[]   @relation("PortfolioCoverImage")
+  clientLogos       Client[]      @relation("ClientLogoImage")
+  testimonialPhotos Testimonial[] @relation("TestimonialPhoto")
+}
+
+// ---------------------------------------------------------------------------
+// Blog
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  posts Post[]
+}
+
+model Tag {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  posts Post[]
+}
+
+model Post {
+  id              String     @id @default(cuid())
+  title           String
+  slug            String     @unique
+  excerpt         String?
+  content         String
+  status          PostStatus @default(DRAFT)
+  authorId        String?
+  author          Author?    @relation(fields: [authorId], references: [id])
+  categoryId      String?
+  category        Category?  @relation(fields: [categoryId], references: [id])
+  tags            Tag[]
+  featuredImageId String?
+  featuredImage   Media?     @relation("PostFeaturedImage", fields: [featuredImageId], references: [id])
+  readingTimeMins Int?
+  tableOfContents Json?
+  faqs            Json?
+
+  seoTitle        String?
+  metaDescription String?
+  focusKeyword    String?
+  canonicalUrl    String?
+  robotsNoindex   Boolean  @default(false)
+  ogImageUrl      String?
+
+  createdById String?
+  updatedById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([slug])
+  @@index([publishedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Generic Page + site-level SEO overrides
+// ---------------------------------------------------------------------------
+
+model Page {
+  id      String        @id @default(cuid())
+  slug    String        @unique
+  title   String
+  content String?
+  status  ContentStatus @default(DRAFT)
+
+  seoTitle        String?
+  metaDescription String?
+  canonicalUrl    String?
+  robotsNoindex   Boolean @default(false)
+  ogImageUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Seo {
+  id              String   @id @default(cuid())
+  path            String   @unique
+  title           String?
+  description     String?
+  ogImageUrl      String?
+  canonicalUrl    String?
+  robotsNoindex   Boolean  @default(false)
+  focusKeyword    String?
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Services / Industries / Locations
+// ---------------------------------------------------------------------------
+
+model Service {
+  id              String        @id @default(cuid())
+  name            String
+  slug            String        @unique
+  icon            String?
+  order           Int           @default(0)
+  status          ContentStatus @default(DRAFT)
+  headline        String?
+  problem         String?
+  solution        String?
+  deliverables    String[]
+  process         String[]
+  benefits        String[]
+  idealClient     String?
+  shortDescription String?
+
+  seoTitle        String?
+  metaDescription String?
+  canonicalUrl    String?
+  robotsNoindex   Boolean @default(false)
+  ogImageUrl      String?
+
+  faqs FAQ[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Industry {
+  id                   String        @id @default(cuid())
+  name                 String
+  slug                 String        @unique
+  order                Int           @default(0)
+  status               ContentStatus @default(DRAFT)
+  challenges           String?
+  solution             String?
+  recommendedServices  String[]
+  contentStrategy      String?
+  leadGenStrategy      String?
+  seoStrategy          String?
+
+  seoTitle        String?
+  metaDescription String?
+  canonicalUrl    String?
+  robotsNoindex   Boolean @default(false)
+  ogImageUrl      String?
+
+  faqs FAQ[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Location {
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  city          String
+  region        String        @default("Maharashtra")
+  status        ContentStatus @default(DRAFT)
+  intro         String?
+  localProblems String?
+  servicesOffered String[]
+  industriesServed String[]
+  processContent String?
+
+  seoTitle        String?
+  metaDescription String?
+  canonicalUrl    String?
+  robotsNoindex   Boolean @default(false)
+  ogImageUrl      String?
+
+  faqs FAQ[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city])
+}
+
+// ---------------------------------------------------------------------------
+// Case Studies / Portfolio / Clients / Testimonials
+// ---------------------------------------------------------------------------
+
+model CaseStudy {
+  id           String   @id @default(cuid())
+  title        String
+  slug         String   @unique
+  clientName   String
+  industry     String?
+  challenge    String?
+  strategy     String?
+  execution    String?
+  servicesUsed String[]
+  timeline     String?
+  budgetRange  String?
+
+  resultsVerified       Boolean @default(false)
+  reach                 Int?
+  engagement             Int?
+  leadsGenerated        Int?
+  conversions           Int?
+  roas                  Float?
+  cpl                   Float?
+  organicTrafficGrowth  Float?
+  keywordGrowth         Int?
+
+  coverImageId String?
+  coverImage   Media?  @relation("CaseStudyCoverImage", fields: [coverImageId], references: [id])
+  gallery      Media[] @relation("CaseStudyGallery")
+
+  testimonialId String?
+  testimonial   Testimonial? @relation(fields: [testimonialId], references: [id])
+
+  status ContentStatus @default(DRAFT)
+
+  seoTitle        String?
+  metaDescription String?
+  canonicalUrl    String?
+  robotsNoindex   Boolean @default(false)
+  ogImageUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Portfolio {
+  id          String            @id @default(cuid())
+  title       String
+  slug        String            @unique
+  category    PortfolioCategory
+  description String?
+  clientName  String?
+  externalUrl String?
+  order       Int               @default(0)
+  status      ContentStatus     @default(DRAFT)
+
+  coverImageId String?
+  coverImage   Media?  @relation("PortfolioCoverImage", fields: [coverImageId], references: [id])
+  gallery      Media[] @relation("PortfolioGallery")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id           String         @id @default(cuid())
+  companyName  String
+  logoId       String?
+  logo         Media?         @relation("ClientLogoImage", fields: [logoId], references: [id])
+  website      String?
+  industry     String?
+  clientSince  DateTime?
+  category     ClientCategory @default(BRAND_WE_ADMIRE)
+  description  String?
+  verified     Boolean        @default(false)
+  published    Boolean        @default(true)
+  order        Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([category])
+}
+
+model Testimonial {
+  id              String    @id @default(cuid())
+  clientName      String
+  designation     String?
+  company         String?
+  photoId         String?
+  photo           Media?    @relation("TestimonialPhoto", fields: [photoId], references: [id])
+  review          String
+  rating          Int?
+  project         String?
+  date            DateTime?
+  videoUrl        String?
+  googleReviewUrl String?
+  verified        Boolean   @default(false)
+  published       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  caseStudies CaseStudy[]
+}
+
+// ---------------------------------------------------------------------------
+// Leads / CRM
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id               String     @id @default(cuid())
+  name             String
+  company          String?
+  phone            String
+  email            String
+  website          String?
+  industry         String?
+  serviceRequired  String?
+  budget           String?
+  message          String?
+  preferredContact String?
+  status           LeadStatus @default(NEW)
+  source           String?
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+  landingPage String?
+  referrer    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// FAQ (global, attachable to any content type via optional slug/category)
+// ---------------------------------------------------------------------------
+
+model FAQ {
+  id         String   @id @default(cuid())
+  question   String
+  answer     String
+  category   String?
+  pageSlug   String?
+  published  Boolean  @default(true)
+  order      Int      @default(0)
+
+  serviceId  String?
+  service    Service?  @relation(fields: [serviceId], references: [id])
+  industryId String?
+  industry   Industry? @relation(fields: [industryId], references: [id])
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Redirects / Newsletter / Backlinks / Glossary / Settings
+// ---------------------------------------------------------------------------
+
+model Redirect {
+  id         String   @id @default(cuid())
+  fromPath   String   @unique
+  toPath     String
+  statusCode Int      @default(301)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model NewsletterSubscriber {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  name         String?
+  status       SubscriberStatus  @default(ACTIVE)
+  subscribedAt DateTime          @default(now())
+}
+
+model Backlink {
+  id           String         @id @default(cuid())
+  website      String
+  domain       String
+  contactName  String?
+  email        String?
+  category     String?
+  authority    Int?
+  status       BacklinkStatus @default(PROSPECT)
+  outreachDate DateTime?
+  response     String?
+  linkUrl      String?
+  anchorText   String?
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model GlossaryTerm {
+  id            String   @id @default(cuid())
+  term          String
+  slug          String   @unique
+  definition    String
+  example       String?
+  relatedTermSlugs String[]
+  relatedBlogSlugs String[]
+  relatedServiceSlugs String[]
+  status        ContentStatus @default(DRAFT)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SiteSetting {
+  id                        String   @id @default("singleton")
+  businessName              String   @default("OlyxMedia")
+  phone                     String   @default("+91 7559191116")
+  email                     String   @default("support@olyxmedia.com")
+  address                   String   @default("Baner, Pune, Maharashtra, India")
+  logoUrl                   String?
+  faviconUrl                String?
+  instagramUrl              String?
+  facebookUrl                String?
+  linkedinUrl               String?
+  youtubeUrl                String?
+  googleMapsEmbedUrl        String?
+  whatsappNumber            String   @default("917559191116")
+  whatsappDefaultMessage    String   @default("Hi OlyxMedia, I want to discuss digital marketing for my business.")
+  ga4Id                     String?
+  gtmId                     String?
+  metaPixelId               String?
+  clarityId                 String?
+  searchConsoleVerification String?
+  defaultSeoTitle           String   @default("Social Media Marketing Agency in Pune | OlyxMedia")
+  defaultSeoDescription     String   @default("OlyxMedia is a Pune-based social media and digital marketing agency helping businesses grow through social media, SEO, paid advertising, content and lead generation.")
+  defaultOgImageUrl         String?
+  updatedAt                 DateTime @updatedAt
+}
