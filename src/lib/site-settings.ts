@@ -30,6 +30,10 @@ const DEFAULT_SITE_SETTINGS: SiteSetting = {
 };
 
 export const getSiteSettings = cache(async (): Promise<SiteSetting> => {
-  const settings = await prisma.siteSetting.findUnique({ where: { id: "singleton" } });
-  return settings ?? { ...DEFAULT_SITE_SETTINGS };
+  try {
+    const settings = await prisma.siteSetting.findUnique({ where: { id: "singleton" } });
+    return settings ?? { ...DEFAULT_SITE_SETTINGS };
+  } catch {
+    return { ...DEFAULT_SITE_SETTINGS };
+  }
 });

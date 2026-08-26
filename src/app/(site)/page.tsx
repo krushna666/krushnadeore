@@ -34,17 +34,21 @@ const WHY_US = [
 ];
 
 async function getHomeData() {
-  const [services, industries, portfolio, caseStudies, testimonials, posts, faqs, clients] = await prisma.$transaction([
-    prisma.service.findMany({ where: { status: "PUBLISHED" }, orderBy: { order: "asc" }, take: 8 }),
-    prisma.industry.findMany({ where: { status: "PUBLISHED" }, orderBy: { order: "asc" }, take: 6 }),
-    prisma.portfolio.findMany({ where: { status: "PUBLISHED" }, orderBy: { order: "asc" }, take: 6 }),
-    prisma.caseStudy.findMany({ where: { status: "PUBLISHED" }, orderBy: { updatedAt: "desc" }, take: 3 }),
-    prisma.testimonial.findMany({ where: { published: true }, orderBy: { createdAt: "desc" }, take: 6 }),
-    prisma.post.findMany({ where: { status: "PUBLISHED" }, orderBy: { publishedAt: "desc" }, take: 3 }),
-    prisma.fAQ.findMany({ where: { published: true, pageSlug: "home" }, orderBy: { order: "asc" }, take: 8 }),
-    prisma.client.findMany({ where: { published: true, verified: true }, orderBy: { order: "asc" }, include: { logo: true }, take: 12 }),
-  ]);
-  return { services, industries, portfolio, caseStudies, testimonials, posts, faqs, clients };
+  try {
+    const [services, industries, portfolio, caseStudies, testimonials, posts, faqs, clients] = await prisma.$transaction([
+      prisma.service.findMany({ where: { status: "PUBLISHED" }, orderBy: { order: "asc" }, take: 8 }),
+      prisma.industry.findMany({ where: { status: "PUBLISHED" }, orderBy: { order: "asc" }, take: 6 }),
+      prisma.portfolio.findMany({ where: { status: "PUBLISHED" }, orderBy: { order: "asc" }, take: 6 }),
+      prisma.caseStudy.findMany({ where: { status: "PUBLISHED" }, orderBy: { updatedAt: "desc" }, take: 3 }),
+      prisma.testimonial.findMany({ where: { published: true }, orderBy: { createdAt: "desc" }, take: 6 }),
+      prisma.post.findMany({ where: { status: "PUBLISHED" }, orderBy: { publishedAt: "desc" }, take: 3 }),
+      prisma.fAQ.findMany({ where: { published: true, pageSlug: "home" }, orderBy: { order: "asc" }, take: 8 }),
+      prisma.client.findMany({ where: { published: true, verified: true }, orderBy: { order: "asc" }, include: { logo: true }, take: 12 }),
+    ]);
+    return { services, industries, portfolio, caseStudies, testimonials, posts, faqs, clients };
+  } catch {
+    return { services: [], industries: [], portfolio: [], caseStudies: [], testimonials: [], posts: [], faqs: [], clients: [] };
+  }
 }
 
 export default async function HomePage() {
