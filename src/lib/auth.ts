@@ -1,39 +1,118 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+
 import { prisma } from "@/lib/db";
 import { loginSchema } from "@/lib/validations/auth";
 import { rateLimit } from "@/lib/rate-limit";
 
-const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+const authSecret =
+  process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+
+if (!authSecret) {
+  throw new Error(
+    "AUTH_SECRET or NEXTAUTH_SECRET must be configured."
+  );
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
-  pages: { signIn: "/admin/login" },
+  secret: authSecret,
+
   trustHost: true,
+
+  session: {
+    strategy: "jwt",
+  },
+
+  pages: {
+    signIn: "/admin/login",
+  },
+
   providers: [
     Credentials({
+      name: "Credentials",
+
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: {
+          label: "Email",
+          type: "email",
+        },
+
+        password: {
+          label: "Password",
+          type: "password",
+        },
       },
+
       async authorize(credentials, request) {
+        // ---------------------------------------------------------------
+        // Validate login input
+        // ---------------------------------------------------------------
         const parsed = loginSchema.safeParse(credentials);
-        if (!parsed.success) return null;
+
+        if (!parsed.success) {
+          return null;
+        }
+
+        const email = parsed.data.email.trim().toLowerCase();
+        const password = parsed.data.password;
+
+        // ---------------------------------------------------------------
+        // Get client IP
+        // ---------------------------------------------------------------
+        const forwardedFor =
+          request.headers.get("x-forwarded-for");
+
+        const realIp =
+          request.headers.get("x-real-ip");
 
         const ip =
-          request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
-          request.headers.get("x-real-ip") ||
+          forwardedFor?.split(",")[0]?.trim() ||
+          realIp ||
           "unknown";
-        const { ok } = rateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
-        if (!ok) return null;
 
-        const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-        if (!user) return null;
+        // ---------------------------------------------------------------
+        // Rate limit login attempts
+        // 10 attempts / 15 minutes
+        // ---------------------------------------------------------------
+        const { ok } = rateLimit(
+          `login:${ip}`,
+          10,
+          15 * 60 * 1000
+        );
 
-        const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
-        if (!valid) return null;
+        if (!ok) {
+          return null;
+        }
 
+        // ---------------------------------------------------------------
+        // Find user
+        // ---------------------------------------------------------------
+        const user = await prisma.user.findUnique({
+          where: {
+            email,
+          },
+        });
+
+        if (!user) {
+          return null;
+        }
+
+        // ---------------------------------------------------------------
+        // Verify password
+        // ---------------------------------------------------------------
+        const validPassword = await bcrypt.compare(
+          password,
+          user.passwordHash
+        );
+
+        if (!validPassword) {
+          return null;
+        }
+
+        // ---------------------------------------------------------------
+        // Return authenticated user
+        // ---------------------------------------------------------------
         return {
           id: user.id,
           name: user.name,
@@ -44,23 +123,48 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+
   callbacks: {
-    jwt({ token, user }) {
+    // ---------------------------------------------------------------
+    // JWT
+    // ---------------------------------------------------------------
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id as string;
-        token.role = (user as { role: "ADMIN" | "EDITOR" }).role;
-        token.mustChangePassword = (user as { mustChangePassword: boolean }).mustChangePassword;
+        if (user.id) {
+  token.id = user.id;
+}
+
+        token.role = (
+          user as {
+            role: "ADMIN" | "EDITOR";
+          }
+        ).role;
+
+        token.mustChangePassword = (
+          user as {
+            mustChangePassword: boolean;
+          }
+        ).mustChangePassword;
       }
+
       return token;
     },
-    session({ session, token }) {
+
+    // ---------------------------------------------------------------
+    // Session
+    // ---------------------------------------------------------------
+    async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "ADMIN" | "EDITOR";
-        session.user.mustChangePassword = token.mustChangePassword as boolean;
+
+        session.user.role =
+          token.role as "ADMIN" | "EDITOR";
+
+        session.user.mustChangePassword =
+          token.mustChangePassword as boolean;
       }
+
       return session;
     },
   },
-  secret: authSecret,
 });
