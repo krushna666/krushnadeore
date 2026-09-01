@@ -43,6 +43,11 @@ CRON_SECRET=<generate a random string>
 NODE_ENV=production
 ```
 
+`AUTH_SECRET` is required for admin login. Generate a long random value and
+add it in hPanel under the Node.js application's environment variables.
+`NEXTAUTH_SECRET` is also accepted for compatibility, but use only one of
+the two names. Restart the application after adding or changing it.
+
 Do **not** upload a `.env` file to the server — hPanel environment
 variables are what your app will actually read in production.
 
@@ -77,3 +82,8 @@ Then immediately change that password from the admin panel.
 Check the app's error log in the same hPanel Node.js screen — it shows
 the actual Node.js stack trace, which is what's needed to debug further
 (the same way a "Build failed" card on Vercel needs its log expanded).
+
+For `There was a problem with the server configuration`, first verify that
+`AUTH_SECRET` or `NEXTAUTH_SECRET` is present in hPanel and restart the app.
+Then verify `DATABASE_URL` and run `npm run db:seed` if the admin user has not
+yet been created.

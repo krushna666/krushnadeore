@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { loginSchema } from "@/lib/validations/auth";
 import { rateLimit } from "@/lib/rate-limit";
 
+const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/admin/login" },
@@ -60,5 +62,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  secret: process.env.AUTH_SECRET,
+  secret: authSecret,
 });

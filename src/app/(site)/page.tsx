@@ -124,10 +124,10 @@ export default async function HomePage() {
         </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { title: "Social Media Marketing", href: "/social-media-marketing" },
-            { title: "SEO & Local SEO", href: "/seo" },
-            { title: "Performance Marketing", href: "/performance-marketing" },
-            { title: "Branding & Design", href: "/branding" },
+            { title: "Social Media Marketing", href: "/services/social-media-marketing" },
+            { title: "SEO & Local SEO", href: "/services/seo" },
+            { title: "Performance Marketing", href: "/services/performance-marketing" },
+            { title: "Branding & Design", href: "/services/branding" },
           ].map((p) => (
             <Link key={p.href} href={p.href} className="group rounded-2xl border border-border p-5 transition hover:border-brand">
               <p className="font-semibold">{p.title}</p>
