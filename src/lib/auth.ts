@@ -2,10 +2,32 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
-// Replace this with your actual database import
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/db";
+import { loginSchema } from "@/lib/validations/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+const authSecret =
+  process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+
+if (!authSecret) {
+  throw new Error(
+    "AUTH_SECRET or NEXTAUTH_SECRET must be configured."
+  );
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: authSecret,
+
+  trustHost: true,
+
+  session: {
+    strategy: "jwt",
+  },
+
+  pages: {
+    signIn: "/admin/login",
+  },
+
   providers: [
     Credentials({
       name: "Credentials",
@@ -15,95 +37,132 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           label: "Email",
           type: "email",
         },
+
         password: {
           label: "Password",
           type: "password",
         },
       },
 
-      async authorize(credentials) {
-        try {
-          // Validate credentials
-          if (
-            !credentials?.email ||
-            !credentials?.password
-          ) {
-            console.error("Missing email or password");
-            return null;
-          }
+      async authorize(credentials, request) {
+        // ---------------------------------------------------------------
+        // Validate login input
+        // ---------------------------------------------------------------
+        const parsed = loginSchema.safeParse(credentials);
 
-          const email = String(credentials.email).trim().toLowerCase();
-          const password = String(credentials.password);
-
-          // Find user
-          const user = await db.user.findUnique({
-            where: {
-              email,
-            },
-          });
-
-          if (!user) {
-            console.error("User not found:", email);
-            return null;
-          }
-
-          // Check password
-          if (!user.password) {
-            console.error("User does not have a password");
-            return null;
-          }
-
-          const passwordValid = await bcrypt.compare(
-            password,
-            user.password
-          );
-
-          if (!passwordValid) {
-            console.error("Invalid password for:", email);
-            return null;
-          }
-
-          // Return authenticated user
-          return {
-            id: String(user.id),
-            name: user.name || email,
-            email: user.email,
-          };
-        } catch (error) {
-          console.error("AUTHORIZATION ERROR:", error);
+        if (!parsed.success) {
           return null;
         }
+
+        const email = parsed.data.email.trim().toLowerCase();
+        const password = parsed.data.password;
+
+        // ---------------------------------------------------------------
+        // Get client IP
+        // ---------------------------------------------------------------
+        const forwardedFor =
+          request.headers.get("x-forwarded-for");
+
+        const realIp =
+          request.headers.get("x-real-ip");
+
+        const ip =
+          forwardedFor?.split(",")[0]?.trim() ||
+          realIp ||
+          "unknown";
+
+        // ---------------------------------------------------------------
+        // Rate limit login attempts
+        // 10 attempts / 15 minutes
+        // ---------------------------------------------------------------
+        const { ok } = rateLimit(
+          `login:${ip}`,
+          10,
+          15 * 60 * 1000
+        );
+
+        if (!ok) {
+          return null;
+        }
+
+        // ---------------------------------------------------------------
+        // Find user
+        // ---------------------------------------------------------------
+        const user = await prisma.user.findUnique({
+          where: {
+            email,
+          },
+        });
+
+        if (!user) {
+          return null;
+        }
+
+        // ---------------------------------------------------------------
+        // Verify password
+        // ---------------------------------------------------------------
+        const validPassword = await bcrypt.compare(
+          password,
+          user.passwordHash
+        );
+
+        if (!validPassword) {
+          return null;
+        }
+
+        // ---------------------------------------------------------------
+        // Return authenticated user
+        // ---------------------------------------------------------------
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          mustChangePassword: user.mustChangePassword,
+        };
       },
     }),
   ],
 
-  session: {
-    strategy: "jwt",
-  },
-
   callbacks: {
+    // ---------------------------------------------------------------
+    // JWT
+    // ---------------------------------------------------------------
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        
+
+        token.role = (
+          user as {
+            role: "ADMIN" | "EDITOR";
+          }
+        ).role;
+
+        token.mustChangePassword = (
+          user as {
+            mustChangePassword: boolean;
+          }
+        ).mustChangePassword;
       }
 
       return token;
     },
 
+    // ---------------------------------------------------------------
+    // Session
+    // ---------------------------------------------------------------
     async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = String(token.id);
+      if (session.user) {
+        session.user.id = token.id as string;
+
+        session.user.role =
+          token.role as "ADMIN" | "EDITOR";
+
+        session.user.mustChangePassword =
+          token.mustChangePassword as boolean;
       }
 
       return session;
     },
   },
-
-  pages: {
-    signIn: "/admin/login",
-  },
-
-  secret: process.env.AUTH_SECRET,
-
-  trustHost: true,
 });
